@@ -171,47 +171,45 @@
     </div>
 
     <script>
+        // 전역 변수 설정
+        let model, webcam, labelContainer, maxPredictions;
+        let isPredicting = false;
+        let portOrDevice = null;
+        let isConnected = false;
+        let transmissionContinuous = true; // 연속 전송 기본값
+        let cameraFacingMode = "user"; // "user" (전면), "environment" (후면)
+        let flipCamera = false;
+
+        // DOM 요소 가져오기
+        const modelUrlInput = document.getElementById("model-url");
+        const thresholdInput = document.getElementById("threshold");
+        const thresholdValue = document.getElementById("threshold-value");
+        const deviceSelect = document.getElementById("device-select");
+        const connectBtn = document.getElementById("connectBtn");
+        const connectText = document.getElementById("connect-text");
+        const connectSpinner = document.getElementById("connect-spinner");
+        const connectionStatus = document.getElementById("connection-status");
+        const loadBtn = document.getElementById("loadBtn");
+        const loadText = document.getElementById("load-text");
+        const loadSpinner = document.getElementById("load-spinner");
+        const stopBtn = document.getElementById("stopBtn");
+        const cameraBtn = document.getElementById("cameraBtn");
+        const flipBtn = document.getElementById("flipBtn");
+        const webcamContainer = document.getElementById("webcam-container");
+        const cameraMessage = document.getElementById("camera-message");
+        const continuousToggle = document.getElementById("continuous-toggle");
+        const continuousLabel = document.getElementById("continuous-label");
+        const singleLabel = document.getElementById("single-label");
+        const alertBox = document.getElementById("custom-alert");
+        const alertMessage = document.getElementById("alert-message");
+        const alertOkBtn = document.getElementById("alert-ok-btn");
+        
+        // 이벤트 리스너는 DOMContentLoaded 시점에 모두 설정
         document.addEventListener("DOMContentLoaded", () => {
-            // 전역 변수 설정
-            let model, webcam, labelContainer, maxPredictions;
-            let isPredicting = false;
-            let portOrDevice = null;
-            let isConnected = false;
-            let transmissionContinuous = true; // 연속 전송 기본값
-            let cameraFacingMode = "user"; // "user" (전면), "environment" (후면)
-            let flipCamera = false;
-
-            // DOM 요소 가져오기
-            const modelUrlInput = document.getElementById("model-url");
-            const thresholdInput = document.getElementById("threshold");
-            const thresholdValue = document.getElementById("threshold-value");
-            const deviceSelect = document.getElementById("device-select");
-            const connectionTypeRadios = document.querySelectorAll('input[name="connection-type"]');
-            const connectBtn = document.getElementById("connectBtn");
-            const connectText = document.getElementById("connect-text");
-            const connectSpinner = document.getElementById("connect-spinner");
-            const connectionStatus = document.getElementById("connection-status");
-            const loadBtn = document.getElementById("loadBtn");
-            const loadText = document.getElementById("load-text");
-            const loadSpinner = document.getElementById("load-spinner");
-            const stopBtn = document.getElementById("stopBtn");
-            const cameraBtn = document.getElementById("cameraBtn");
-            const flipBtn = document.getElementById("flipBtn");
-            const webcamContainer = document.getElementById("webcam-container");
-            const cameraMessage = document.getElementById("camera-message");
-            const continuousToggle = document.getElementById("continuous-toggle");
-            const continuousLabel = document.getElementById("continuous-label");
-            const singleLabel = document.getElementById("single-label");
-            const alertBox = document.getElementById("custom-alert");
-            const alertMessage = document.getElementById("alert-message");
-            const alertOkBtn = document.getElementById("alert-ok-btn");
-
-            // 이벤트 리스너
             const defaultModelUrl = "https://teachablemachine.withgoogle.com/models/b35eS6c3G/";
             modelUrlInput.value = defaultModelUrl;
 
             loadBtn.addEventListener("click", init);
-            
             thresholdInput.addEventListener("input", () => {
                 thresholdValue.textContent = thresholdInput.value;
             });
@@ -223,299 +221,299 @@
             alertOkBtn.addEventListener("click", () => {
                 alertBox.classList.add('hidden');
             });
-
-            // 커스텀 알림 함수 (alert() 대체)
-            function customAlert(message) {
-                alertMessage.textContent = message;
-                alertBox.classList.remove('hidden');
-            }
-
-            // 전송 방식 토글 함수
-            function toggleTransmissionMode() {
-                transmissionContinuous = !transmissionContinuous;
-                continuousToggle.querySelector('div').style.transform = transmissionContinuous ? 'translateX(16px)' : 'translateX(0)';
-                continuousLabel.classList.toggle('text-blue-500', transmissionContinuous);
-                continuousLabel.classList.toggle('font-semibold', transmissionContinuous);
-                continuousLabel.classList.toggle('text-gray-400', !transmissionContinuous);
-                singleLabel.classList.toggle('text-blue-500', !transmissionContinuous);
-                singleLabel.classList.toggle('font-semibold', !transmissionContinuous);
-                singleLabel.classList.toggle('text-gray-400', transmissionContinuous);
-            }
-
-            // 연결 처리 함수 (시리얼/블루투스)
-            async function handleConnection() {
-                if (isConnected) {
-                    disconnectDevice();
-                } else {
-                    const connectionType = document.querySelector('input[name="connection-type"]:checked').value;
-                    if (connectionType === 'serial') {
-                        connectSerial();
-                    } else if (connectionType === 'bluetooth') {
-                        connectBluetooth();
-                    }
-                }
-            }
-            
-            // 연결 해제 함수
-            async function disconnectDevice() {
-                try {
-                    if (portOrDevice) {
-                        if (portOrDevice.close) {
-                            await portOrDevice.close();
-                        } else if (portOrDevice.gatt && portOrDevice.gatt.disconnect) {
-                            portOrDevice.gatt.disconnect();
-                        }
-                    }
-                    portOrDevice = null;
-                    isConnected = false;
-                    connectionStatus.textContent = '연결되지 않음';
-                    connectText.textContent = '연결';
-                    customAlert('연결이 해제되었습니다.');
-                } catch (error) {
-                    console.error('연결 해제 실패:', error);
-                    customAlert('연결 해제에 실패했습니다.');
-                }
-            }
-
-            // 시리얼 연결 함수
-            async function connectSerial() {
-                try {
-                    connectText.textContent = '연결 중...';
-                    connectSpinner.classList.remove('hidden');
-                    portOrDevice = await navigator.serial.requestPort();
-                    await portOrDevice.open({ baudRate: 9600 });
-                    isConnected = true;
-                    connectionStatus.textContent = '시리얼 연결됨';
-                    connectText.textContent = '연결 해제';
-                    customAlert('시리얼 포트에 성공적으로 연결되었습니다.');
-                } catch (error) {
-                    console.error('시리얼 연결 실패:', error);
-                    connectionStatus.textContent = '연결 실패';
-                    connectText.textContent = '연결';
-                    customAlert('시리얼 연결에 실패했습니다. Chrome 최신 버전에서 실행했는지 확인해주세요.');
-                } finally {
-                    connectSpinner.classList.add('hidden');
-                }
-            }
-
-            // 블루투스 연결 함수
-            async function connectBluetooth() {
-                try {
-                    connectText.textContent = '연결 중...';
-                    connectSpinner.classList.remove('hidden');
-                    
-                    // 마이크로비트 서비스 UUIDs
-                    const microbitServiceUUID = 0xef6801009b354933a9b1523c10332342;
-                    const microbitCharacteristicUUID = 0xef6801019b354933a9b1523c10332342;
-
-                    portOrDevice = await navigator.bluetooth.requestDevice({
-                        filters: [{ services: [microbitServiceUUID] }]
-                    });
-
-                    const server = await portOrDevice.gatt.connect();
-                    const service = await server.getPrimaryService(microbitServiceUUID);
-                    const characteristic = await service.getCharacteristic(microbitCharacteristicUUID);
-
-                    window.bluetoothCharacteristic = characteristic; // 전역 변수로 저장하여 sendData에서 사용
-
-                    isConnected = true;
-                    connectionStatus.textContent = '블루투스 연결됨';
-                    connectText.textContent = '연결 해제';
-                    customAlert('블루투스 장치에 성공적으로 연결되었습니다.');
-                } catch (error) {
-                    console.error('블루투스 연결 실패:', error);
-                    connectionStatus.textContent = '연결 실패';
-                    connectText.textContent = '연결';
-                    customAlert('블루투스 연결에 실패했습니다. 마이크로비트가 블루투스 페어링 모드인지 확인해주세요.');
-                } finally {
-                    connectSpinner.classList.add('hidden');
-                }
-            }
-
-            // 데이터 전송 함수 (시리얼/블루투스)
-            async function sendData(data) {
-                if (!isConnected || !portOrDevice) {
-                    console.error('장치가 연결되지 않았습니다.');
-                    return;
-                }
-                try {
-                    if (document.querySelector('input[name="connection-type"]:checked').value === 'serial') {
-                        // 시리얼 전송
-                        const encoder = new TextEncoder();
-                        const writer = portOrDevice.writable.getWriter();
-                        await writer.write(encoder.encode(data));
-                        writer.releaseLock();
-                    } else if (document.querySelector('input[name="connection-type"]:checked').value === 'bluetooth') {
-                        // 블루투스 전송
-                        const encoder = new TextEncoder();
-                        const value = encoder.encode(data);
-                        await window.bluetoothCharacteristic.writeValue(value);
-                    }
-                } catch (error) {
-                    console.error('데이터 전송 실패:', error);
-                    customAlert('데이터 전송에 실패했습니다.');
-                }
-            }
-
-            // 모델 초기화 및 예측 시작
-            async function init() {
-                try {
-                    // UI 상태 변경
-                    loadText.textContent = '모델 로드 중...';
-                    loadSpinner.classList.remove('hidden');
-                    cameraMessage.textContent = '모델 로드 중...';
-                    
-                    const modelURL = modelUrlInput.value + "model.json";
-                    const metadataURL = modelUrlInput.value + "metadata.json";
-
-                    // 모델 로드
-                    model = await tmImage.load(modelURL, metadataURL);
-                    maxPredictions = model.getTotalClasses();
-
-                    // 웹캠 설정
-                    const flip = flipCamera;
-                    webcam = new tmImage.Webcam(400, 300, flip);
-                    await webcam.setup({ facingMode: cameraFacingMode });
-                    await webcam.play();
-                    window.requestAnimationFrame(loop);
-
-                    // DOM에 웹캠 추가
-                    webcamContainer.innerHTML = '';
-                    webcamContainer.appendChild(webcam.canvas);
-                    cameraMessage.classList.add('hidden');
-
-                    // 결과 표시 컨테이너 설정
-                    labelContainer = document.getElementById("label-container");
-                    labelContainer.innerHTML = '';
-                    for (let i = 0; i < maxPredictions; i++) {
-                        const progressContainer = document.createElement("div");
-                        progressContainer.className = "flex items-center gap-2 mb-2";
-                        
-                        const labelDiv = document.createElement("div");
-                        labelDiv.className = "text-sm font-semibold text-gray-400 w-1/4";
-                        labelDiv.textContent = "클래스";
-                        
-                        const progressBarBg = document.createElement("div");
-                        progressBarBg.className = "w-2/3 h-4 bg-gray-600 rounded-full overflow-hidden";
-                        
-                        const progressBar = document.createElement("div");
-                        progressBar.className = "h-full bg-blue-500 rounded-full transition-all duration-300";
-                        progressBar.style.width = "0%";
-
-                        const probabilitySpan = document.createElement("span");
-                        probabilitySpan.className = "w-1/6 text-sm text-gray-400";
-                        probabilitySpan.textContent = "0%";
-
-                        progressBarBg.appendChild(progressBar);
-                        progressContainer.appendChild(labelDiv);
-                        progressContainer.appendChild(progressBarBg);
-                        progressContainer.appendChild(probabilitySpan);
-                        labelContainer.appendChild(progressContainer);
-                    }
-
-                    isPredicting = true;
-                    customAlert('모델이 성공적으로 로드되었습니다!');
-                } catch (error) {
-                    console.error('모델 로드 실패:', error);
-                    customAlert('모델 로드에 실패했습니다. URL을 확인해주세요.');
-                    stopPredicting();
-                } finally {
-                    loadText.textContent = '모델 로드';
-                    loadSpinner.classList.add('hidden');
-                }
-            }
-
-            // 카메라 전환 함수
-            async function toggleCamera() {
-                cameraFacingMode = cameraFacingMode === "user" ? "environment" : "user";
-                stopPredicting();
-                await init();
-            }
-
-            // 카메라 좌우 반전 함수
-            function toggleFlip() {
-                flipCamera = !flipCamera;
-                if (webcam && webcam.canvas) {
-                    if (flipCamera) {
-                        webcam.canvas.classList.add("flip-horizontal");
-                    } else {
-                        webcam.canvas.classList.remove("flip-horizontal");
-                    }
-                }
-            }
-
-            // 예측 루프
-            async function loop() {
-                if (!isPredicting) return;
-                webcam.update();
-                await predict();
-                window.requestAnimationFrame(loop);
-            }
-            
-            // 예측 중지 함수
-            function stopPredicting() {
-                isPredicting = false;
-                if (webcam) { // webcam 객체가 정의되었는지 확인
-                    webcam.stop();
-                    webcamContainer.innerHTML = '';
-                }
-                cameraMessage.classList.remove('hidden');
-                cameraMessage.textContent = '인식이 중지되었습니다.';
-                labelContainer.innerHTML = '<div class="text-center text-gray-400">모델을 로드하면 결과가 표시됩니다.</div>';
-            }
-
-            // 예측 함수
-            async function predict() {
-                if (!webcam) return; // webcam 객체가 없으면 예측 중지
-                // 예측 결과 가져오기
-                const prediction = await model.predict(webcam.canvas);
-                const threshold = thresholdInput.value / 100;
-                
-                let topPrediction = null;
-                let highestProbability = 0;
-
-                // 결과 업데이트 및 최고 확률 클래스 찾기
-                for (let i = 0; i < maxPredictions; i++) {
-                    const progressContainer = labelContainer.children[i];
-                    const labelDiv = progressContainer.children[0];
-                    const progressBar = progressContainer.children[1].children[0];
-                    const probabilitySpan = progressContainer.children[2];
-
-                    labelDiv.textContent = prediction[i].className;
-                    progressBar.style.width = prediction[i].probability.toFixed(2) * 100 + "%";
-                    probabilitySpan.textContent = `${(prediction[i].probability.toFixed(2) * 100).toFixed(0)}%`;
-
-                    if (prediction[i].probability > highestProbability) {
-                        highestProbability = prediction[i].probability;
-                        topPrediction = prediction[i];
-                    }
-                }
-
-                // 임계값 만족 시 데이터 전송
-                if (topPrediction && highestProbability >= threshold && isConnected) {
-                    const device = deviceSelect.value;
-                    let dataToSend = '';
-
-                    // 장치에 따른 데이터 포맷
-                    if (device === 'microbit') {
-                        // 마이크로비트용 데이터 포맷 (예: <A_0.98>)
-                        dataToSend = `<${topPrediction.className.substring(0, 1).toUpperCase()}_${highestProbability.toFixed(2)}>`;
-                    } else {
-                        // 일반 장치용 데이터 포맷 (예: Class_A,0.98)
-                        dataToSend = `${topPrediction.className.replace(/\s/g, '_')},${highestProbability.toFixed(2)}\n`;
-                    }
-                    
-                    sendData(dataToSend);
-
-                    // 1회 전송 방식인 경우, 인식 중지
-                    if (!transmissionContinuous) {
-                        stopPredicting();
-                        continuousToggle.click();
-                        customAlert('1회 전송이 완료되었습니다.');
-                    }
-                }
-            }
         });
+
+        // 커스텀 알림 함수 (alert() 대체)
+        function customAlert(message) {
+            alertMessage.textContent = message;
+            alertBox.classList.remove('hidden');
+        }
+
+        // 전송 방식 토글 함수
+        function toggleTransmissionMode() {
+            transmissionContinuous = !transmissionContinuous;
+            continuousToggle.querySelector('div').style.transform = transmissionContinuous ? 'translateX(16px)' : 'translateX(0)';
+            continuousLabel.classList.toggle('text-blue-500', transmissionContinuous);
+            continuousLabel.classList.toggle('font-semibold', transmissionContinuous);
+            continuousLabel.classList.toggle('text-gray-400', !transmissionContinuous);
+            singleLabel.classList.toggle('text-blue-500', !transmissionContinuous);
+            singleLabel.classList.toggle('font-semibold', !transmissionContinuous);
+            singleLabel.classList.toggle('text-gray-400', transmissionContinuous);
+        }
+
+        // 연결 처리 함수 (시리얼/블루투스)
+        async function handleConnection() {
+            if (isConnected) {
+                disconnectDevice();
+            } else {
+                const connectionType = document.querySelector('input[name="connection-type"]:checked').value;
+                if (connectionType === 'serial') {
+                    connectSerial();
+                } else if (connectionType === 'bluetooth') {
+                    connectBluetooth();
+                }
+            }
+        }
+        
+        // 연결 해제 함수
+        async function disconnectDevice() {
+            try {
+                if (portOrDevice) {
+                    if (portOrDevice.close) {
+                        await portOrDevice.close();
+                    } else if (portOrDevice.gatt && portOrDevice.gatt.disconnect) {
+                        portOrDevice.gatt.disconnect();
+                    }
+                }
+                portOrDevice = null;
+                isConnected = false;
+                connectionStatus.textContent = '연결되지 않음';
+                connectText.textContent = '연결';
+                customAlert('연결이 해제되었습니다.');
+            } catch (error) {
+                console.error('연결 해제 실패:', error);
+                customAlert('연결 해제에 실패했습니다.');
+            }
+        }
+
+        // 시리얼 연결 함수
+        async function connectSerial() {
+            try {
+                connectText.textContent = '연결 중...';
+                connectSpinner.classList.remove('hidden');
+                portOrDevice = await navigator.serial.requestPort();
+                await portOrDevice.open({ baudRate: 9600 });
+                isConnected = true;
+                connectionStatus.textContent = '시리얼 연결됨';
+                connectText.textContent = '연결 해제';
+                customAlert('시리얼 포트에 성공적으로 연결되었습니다.');
+            } catch (error) {
+                console.error('시리얼 연결 실패:', error);
+                connectionStatus.textContent = '연결 실패';
+                connectText.textContent = '연결';
+                customAlert('시리얼 연결에 실패했습니다. Chrome 최신 버전에서 실행했는지 확인해주세요.');
+            } finally {
+                connectSpinner.classList.add('hidden');
+            }
+        }
+
+        // 블루투스 연결 함수
+        async function connectBluetooth() {
+            try {
+                connectText.textContent = '연결 중...';
+                connectSpinner.classList.remove('hidden');
+                
+                // 마이크로비트 서비스 UUIDs
+                const microbitServiceUUID = 0xef6801009b354933a9b1523c10332342;
+                const microbitCharacteristicUUID = 0xef6801019b354933a9b1523c10332342;
+
+                portOrDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [microbitServiceUUID] }]
+                });
+
+                const server = await portOrDevice.gatt.connect();
+                const service = await server.getPrimaryService(microbitServiceUUID);
+                const characteristic = await service.getCharacteristic(microbitCharacteristicUUID);
+
+                window.bluetoothCharacteristic = characteristic; // 전역 변수로 저장하여 sendData에서 사용
+
+                isConnected = true;
+                connectionStatus.textContent = '블루투스 연결됨';
+                connectText.textContent = '연결 해제';
+                customAlert('블루투스 장치에 성공적으로 연결되었습니다.');
+            } catch (error) {
+                console.error('블루투스 연결 실패:', error);
+                connectionStatus.textContent = '연결 실패';
+                connectText.textContent = '연결';
+                customAlert('블루투스 연결에 실패했습니다. 마이크로비트가 블루투스 페어링 모드인지 확인해주세요.');
+            } finally {
+                connectSpinner.classList.add('hidden');
+            }
+        }
+
+        // 데이터 전송 함수 (시리얼/블루투스)
+        async function sendData(data) {
+            if (!isConnected || !portOrDevice) {
+                console.error('장치가 연결되지 않았습니다.');
+                return;
+            }
+            try {
+                if (document.querySelector('input[name="connection-type"]:checked').value === 'serial') {
+                    // 시리얼 전송
+                    const encoder = new TextEncoder();
+                    const writer = portOrDevice.writable.getWriter();
+                    await writer.write(encoder.encode(data));
+                    writer.releaseLock();
+                } else if (document.querySelector('input[name="connection-type"]:checked').value === 'bluetooth') {
+                    // 블루투스 전송
+                    const encoder = new TextEncoder();
+                    const value = encoder.encode(data);
+                    await window.bluetoothCharacteristic.writeValue(value);
+                }
+            } catch (error) {
+                console.error('데이터 전송 실패:', error);
+                customAlert('데이터 전송에 실패했습니다.');
+            }
+        }
+
+        // 모델 초기화 및 예측 시작
+        async function init() {
+            try {
+                // UI 상태 변경
+                loadText.textContent = '모델 로드 중...';
+                loadSpinner.classList.remove('hidden');
+                cameraMessage.textContent = '모델 로드 중...';
+                
+                const modelURL = modelUrlInput.value + "model.json";
+                const metadataURL = modelUrlInput.value + "metadata.json";
+
+                // 모델 로드
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // 웹캠 설정
+                const flip = flipCamera;
+                webcam = new tmImage.Webcam(400, 300, flip);
+                await webcam.setup({ facingMode: cameraFacingMode });
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                // DOM에 웹캠 추가
+                webcamContainer.innerHTML = '';
+                webcamContainer.appendChild(webcam.canvas);
+                cameraMessage.classList.add('hidden');
+
+                // 결과 표시 컨테이너 설정
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = '';
+                for (let i = 0; i < maxPredictions; i++) {
+                    const progressContainer = document.createElement("div");
+                    progressContainer.className = "flex items-center gap-2 mb-2";
+                    
+                    const labelDiv = document.createElement("div");
+                    labelDiv.className = "text-sm font-semibold text-gray-400 w-1/4";
+                    labelDiv.textContent = "클래스";
+                    
+                    const progressBarBg = document.createElement("div");
+                    progressBarBg.className = "w-2/3 h-4 bg-gray-600 rounded-full overflow-hidden";
+                    
+                    const progressBar = document.createElement("div");
+                    progressBar.className = "h-full bg-blue-500 rounded-full transition-all duration-300";
+                    progressBar.style.width = "0%";
+
+                    const probabilitySpan = document.createElement("span");
+                    probabilitySpan.className = "w-1/6 text-sm text-gray-400";
+                    probabilitySpan.textContent = "0%";
+
+                    progressBarBg.appendChild(progressBar);
+                    progressContainer.appendChild(labelDiv);
+                    progressContainer.appendChild(progressBarBg);
+                    progressContainer.appendChild(probabilitySpan);
+                    labelContainer.appendChild(progressContainer);
+                }
+
+                isPredicting = true;
+                customAlert('모델이 성공적으로 로드되었습니다!');
+            } catch (error) {
+                console.error('모델 로드 실패:', error);
+                customAlert('모델 로드에 실패했습니다. URL을 확인해주세요.');
+                stopPredicting();
+            } finally {
+                loadText.textContent = '모델 로드';
+                loadSpinner.classList.add('hidden');
+            }
+        }
+
+        // 카메라 전환 함수
+        async function toggleCamera() {
+            cameraFacingMode = cameraFacingMode === "user" ? "environment" : "user";
+            stopPredicting();
+            await init();
+        }
+
+        // 카메라 좌우 반전 함수
+        function toggleFlip() {
+            flipCamera = !flipCamera;
+            if (webcam && webcam.canvas) {
+                if (flipCamera) {
+                    webcam.canvas.classList.add("flip-horizontal");
+                } else {
+                    webcam.canvas.classList.remove("flip-horizontal");
+                }
+            }
+        }
+
+        // 예측 루프
+        async function loop() {
+            if (!isPredicting) return;
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+        
+        // 예측 중지 함수
+        function stopPredicting() {
+            isPredicting = false;
+            if (webcam) { // webcam 객체가 정의되었는지 확인
+                webcam.stop();
+                webcamContainer.innerHTML = '';
+            }
+            cameraMessage.classList.remove('hidden');
+            cameraMessage.textContent = '인식이 중지되었습니다.';
+            labelContainer.innerHTML = '<div class="text-center text-gray-400">모델을 로드하면 결과가 표시됩니다.</div>';
+        }
+
+        // 예측 함수
+        async function predict() {
+            if (!webcam) return; // webcam 객체가 없으면 예측 중지
+            // 예측 결과 가져오기
+            const prediction = await model.predict(webcam.canvas);
+            const threshold = thresholdInput.value / 100;
+            
+            let topPrediction = null;
+            let highestProbability = 0;
+
+            // 결과 업데이트 및 최고 확률 클래스 찾기
+            for (let i = 0; i < maxPredictions; i++) {
+                const progressContainer = labelContainer.children[i];
+                const labelDiv = progressContainer.children[0];
+                const progressBar = progressContainer.children[1].children[0];
+                const probabilitySpan = progressContainer.children[2];
+
+                labelDiv.textContent = prediction[i].className;
+                progressBar.style.width = prediction[i].probability.toFixed(2) * 100 + "%";
+                probabilitySpan.textContent = `${(prediction[i].probability.toFixed(2) * 100).toFixed(0)}%`;
+
+                if (prediction[i].probability > highestProbability) {
+                    highestProbability = prediction[i].probability;
+                    topPrediction = prediction[i];
+                }
+            }
+
+            // 임계값 만족 시 데이터 전송
+            if (topPrediction && highestProbability >= threshold && isConnected) {
+                const device = deviceSelect.value;
+                let dataToSend = '';
+
+                // 장치에 따른 데이터 포맷
+                if (device === 'microbit') {
+                    // 마이크로비트용 데이터 포맷 (예: <A_0.98>)
+                    dataToSend = `<${topPrediction.className.substring(0, 1).toUpperCase()}_${highestProbability.toFixed(2)}>`;
+                } else {
+                    // 일반 장치용 데이터 포맷 (예: Class_A,0.98)
+                    dataToSend = `${topPrediction.className.replace(/\s/g, '_')},${highestProbability.toFixed(2)}\n`;
+                }
+                
+                sendData(dataToSend);
+
+                // 1회 전송 방식인 경우, 인식 중지
+                if (!transmissionContinuous) {
+                    stopPredicting();
+                    continuousToggle.click();
+                    customAlert('1회 전송이 완료되었습니다.');
+                }
+            }
+        }
     </script>
 </body>
 </html>
