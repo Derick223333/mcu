@@ -210,10 +210,18 @@
             const defaultModelUrl = "https://teachablemachine.withgoogle.com/models/b35eS6c3G/";
             modelUrlInput.value = defaultModelUrl;
         });
+
+        // init 함수는 모델 로드 버튼 클릭 시 호출
+        loadBtn.addEventListener("click", init);
+        
+        // 페이지가 완전히 로드된 후 init 함수를 호출하도록 수정
+        window.addEventListener("load", () => {
+             // init 함수가 페이지 로드 시 자동으로 호출되는 것을 막고, '모델 로드' 버튼 클릭 시만 실행하도록 수정
+        });
+
         thresholdInput.addEventListener("input", () => {
             thresholdValue.textContent = thresholdInput.value;
         });
-        loadBtn.addEventListener("click", init);
         stopBtn.addEventListener("click", stopPredicting);
         cameraBtn.addEventListener("click", toggleCamera);
         flipBtn.addEventListener("click", toggleFlip);
